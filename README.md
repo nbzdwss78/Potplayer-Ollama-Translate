@@ -2,9 +2,9 @@
 
 This is a plugin for Potplayer that allows real-time subtitle translation using Ollama.
 
-- Support Qwen3 & Deepseek-R1 reasoning models
-- Allow some custom settings
-- Better context handling, and customizable
+- Native Ollama API support, with added thinking-strength support for gpt-oss
+- [Features](#features)
+- Tested work with ollama 0.13.0
 
 <div align="center">
   <a href="https://github.com/Nuo27/Potplayer-Ollama-Translate/blob/master/README_zh.md">简体中文</a> | <strong>English</strong>
@@ -24,10 +24,11 @@ This is a plugin for Potplayer that allows real-time subtitle translation using 
 
 ## Features
 
-- Add supports for reasoning models
-- Improve context history handler
-- Prompts of paraphrase and two-steps translation strategy
-- custom model configuration (temperature, top_p, etc.)
+- Native Ollama API support, with added thinking-strength support for gpt-oss
+- Supports reasoning/thinking features for models like qwen3, deepseek-r1, gpt-oss, etc.
+- Configurable context history
+- Customizable model parameter settings
+- New translation prompts and strategies
 
 ## Usage
 
@@ -41,36 +42,40 @@ This is a plugin for Potplayer that allows real-time subtitle translation using 
 
 ## NOTES
 
-- **Make sure to update the model and ollama to >= 0.9.0** for ollama's native thinking support. qwen3's think prompt is not yet removed since it wasnt really working under my testing.
-- Qwen3, Deepseek-r1 with old template & capabilities and ollama <0.9.0 are **compatible** but other models might not compatible and you can manually add their think tags and `bool` value under `ModelConfig` to add a item in `options` field.
-- Remember to adjust the **prompts** according to your needs, as they can significantly affect the quality of the output.
-- Please ensure that your model **supports multilingual tasks** otherwise the quality of the translation might be affected.
-- Reasoning should be **turned off** if not needed as it can significantly affect the speed of translation.
+- **Please ensure the model and Ollama are updated to version >= 0.9.0** ~~to use Ollama’s native thinking support. The thinking prompt for qwen3 has not been removed yet because in my tests it didn’t really work..~~
+- Version v2.1 of the plugin uses the native Ollama API and fully supports Ollama’s thinking parameters. It has been tested under ollama 0.13.0.
+- Older plugin versions still use the OpenAI-compatible API. Custom parameters remain supported, but native thinking is not available.
+- ~~Qwen3, Deepseek-r1 with old template & capabilities and ollama <0.9.0 are **compatible** but other models might not compatible and you can manually add their think tags and `bool` value under `ModelConfig` to add a item in `options` field.~~
+- The plugin provides several prompt templates; adjust them as needed based on translation quality.
+- Ensure you use a model that supports multilingual tasks.
+- Generally, reasoning/thinking should be turned off because it significantly slows down translation and is usually unnecessary for simple translation tasks.
+- Highly recommended to use Instruct models, such as `qwen3:30b-a3b-instruct-2507-q4_K_M`
+- Tested models can be found in [Performance](#performance)
 
 ## Customization
 
 **Model Selection**
 | Variable | Description |
-|--------|-------------|
-| `DEFAULT_MODEL_NAME` | Default model name (default: `"qwen3:14b"`). **This will enable if you didnt setup model in Potplayer's Settings** |
+| -------- | ----------- |
+| `DEFAULT_MODEL_NAME` | Default model name (default: `"qwen3:30b-a3b-instruct-2507-q4_K_M"`). **Used when no model is configured in Potplayer.** |
 
 **Model Configuration**  
-| Variable | Recommended Value | Description |
-|--------|-------------|-------------|
-| `temperature` | `0.1 - 0.3` | Lower values make the output more deterministic and less creative. **If you want paraphrased translation, you may want to increase this a bit**|
-| `topP` | `0.8 - 0.95` | Only the smallest set of top tokens whose cumulative probability ≥ topP are considered.|
-|`topK`| `20-40` | Only considers the top K most likely tokens at each generation step.|
-| `minP` | `0.01 - 0.1` | Filters out tokens with probability lower than minP, even if they are in `topP` or `topK`|
-|`repeatPenalty` | `1.0 - 2.0` | Penalizes tokens that have already been generated, discouraging repetition|
-|`maxTokens` | `1024-2048` | Maximum number of tokens that can be generated in`However you dont need to tweak this since ollama wont ban you.`|
+| Variable | Example Value | Description |
+| -------- | ------------- | ----------- |
+| `temperature` | `0.1 - 0.3` | Lower values give more deterministic results. Slightly increase for paraphrased translation. |
+| `topP` | `0.8 - 0.95` | Considers only token sets whose cumulative probability ≥ topP. |
+| `topK` | `20-40` | Considers the top K most probable tokens at each step. |
+| `minP` | `0.01 - 0.1` | Filters tokens below this probability, even if included in topP/topK. |
+| `repeatPenalty` | `1.0 - 2.0` | Penalizes repeated tokens to reduce duplication. |
+| `maxTokens` | `1024-2048` | Max number of tokens generated. |
 
-> Additional parameters can be added as needed. Make sure to update the `GetActiveParams` method accordingly
+> You can add more parameters if needed, but usually only temperature and topP require adjustment. Make sure to update the `GetActiveParams` method accordingly
 
-**Reasoning Configuration**  
-| Variable | Recommended Value | Description |
-|--------|-------------|-------------|
-| `isReasoningModel` | `false` | Only check this if you are using a model that supports reasoning. |
-| `activateReasoning` | `false` | Activates reasoning in the model. Highly recommended to turn if `off`|
+**Reasoning/Thinking Configuration**  
+| Variable | Example Value | Description |
+| -------- | ------------- | ----------- |
+| `enableThinking` | `false` | Enables reasoning mode. Strongly recommended to keep this off. |
+| `thinkStrength` | `"low"` `"medium"` `"high"` `""` | Thinking strength for gpt-oss. Only applies to gpt-oss. If `enableThinking` = false, `low` is applied automatically. |
 
 **Context History**  
 | Variable | Recommended Value | Description |
@@ -82,32 +87,43 @@ This is a plugin for Potplayer that allows real-time subtitle translation using 
 > if you increase the entries significantly, the response time might also increase significantly due to the larger context size. and you got to adjust tokens as well.
 
 **Prompts**  
+The plugin provides several prompt templates that can be freely customized.
 | Prompt | Description |
 |--------|-------------|
-| `SYSTEM_PROMPT` | This prompt and context history will be combined to form the final System prompt for the model. |
-| `USER_PROMPT_BASE` | User prompt that require model to paraphrase the output by default. |
-| `backup_system_prompt` | Backup System prompt.|
-| `two_step_process_prompt` | User prompt that require model to follow a two-step process by default |
+| `SYSTEM_PROMPT_BASE` | Base system prompt, combined with context prefix to form final system prompt. |
+| `SYSTEM_PROMPT_END` | Appended to end of system prompt to specify user task. |
+| `USER_PROMPT_BASE` | Base user prompt. |
+| `CONTEXT_PROMPT` | Context prefix specifying history. |
+| `SYSTEM_PROMPT_OLD` | Prompt used in previous version. |
+| `SYSTEM_PROMPT_BASIC` | Simplified system prompt for weaker models or low context tolerance. |
+| `SYSTEM_PROMPT_BASIC_OLD_TWO_STEP` | Two-step translation strategy from previous version. |
+
+| Variable          | Default              | Description                              |
+| ----------------- | -------------------- | ---------------------------------------- |
+| `userPrompt`      | `USER_PROMPT_BASE`   | Uses USER_PROMPT_BASE as user prompt     |
+| `systemPrompt`    | `SYSTEM_PROMPT_BASE` | Uses SYSTEM_PROMPT_BASE as system prompt |
+| `systemPromptEnd` | `SYSTEM_PROMPT_END`  | Appended at end of system prompt         |
+
+> **Note**: Ensure your model can handle these prompts to avoid inaccurate or failed translations.
 
 ## Performance
 
-**Tested models:**
+**Supported Models:**
 
-- qwen3:14b
-- gemma3:12b
-- deepseek-r1:14b-qwen-distill-q4_K_M
-- aya-expanse:8b
-- granite3.3:8b
-- phi4:14b
-- llama3.1:8b
+- Newly added support for gpt-oss
+- and the plugin should now support all official Ollama models
+- including most models in huggingface as long as the model is officially supported by ollama
+
+> this means any model should work as long as it runs in Ollama app or through ollama cli
 
 **Recommendations**
 
-- qwen3:14b (thinking not enabled) is the best model with this prompt tested so far.
-- gemma3:12b works well with simple prompt.
-- and others are just fine, but not as good as qwen3.
+- qwen3:30B-A3B-Instruct-2507-Q3_K_S
+- gpt-oss:20b
+- gemma3:12b / gemma3n:e4b
+- for lower-end users, consider qwen3:4b-instruct
 
-> Adjust prompt makes big impact on models' performance and these reckons are just FYI.
+> Please test your tokens/s. Slow models may delay or fail translation.
 
 ## References
 
