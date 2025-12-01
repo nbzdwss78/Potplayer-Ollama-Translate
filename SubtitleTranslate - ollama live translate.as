@@ -622,7 +622,7 @@ array<string> GetDstLangs() {
 
 string Translate(string Text, string &in SrcLang, string &in DstLang) {
     if (!g_isPluginActive) {
-        return "";
+        return "Plugin is not loaded normally, please check settings";
     }
     LoadUserConfig();
     
@@ -713,7 +713,7 @@ void OnInitialize() {
     // OPEN CONSOLE
     // Open the console for debugging purposes
     // PLEASE comment out the following line if debugging is not needed
-    HostOpenConsole();
+    // HostOpenConsole();
 
     HostPrintUTF8("Ollama translation plugin initialized\n");
 }
